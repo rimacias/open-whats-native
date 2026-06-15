@@ -178,3 +178,52 @@ func (ui *AppUI) showAttachDialog() {
 	// Set file filter if needed
 	d.Show()
 }
+
+func (ui *AppUI) showChatDetailsDialog() {
+	if ui.activeJID == "" {
+		return
+	}
+
+	// Fetch contact info
+	var name string
+	var pushName string
+	lookupJID := ui.activeJID
+	if !strings.Contains(lookupJID, "@") {
+		lookupJID += "@s.whatsapp.net"
+	}
+	
+	if c, err := ui.client.GetContact(context.Background(), lookupJID); err == nil {
+		name = c.Name
+		pushName = c.PushName
+	}
+	
+	displayName := name
+	if displayName == "" {
+		displayName = pushName
+	}
+	if displayName == "" {
+		displayName = ui.activeJID
+	}
+
+	avatarBytes := ui.avatarMap[lookupJID]
+	var avatarImg *canvas.Image
+	if len(avatarBytes) > 0 {
+		avatarImg = canvas.NewImageFromResource(fyne.NewStaticResource("avatar.png", avatarBytes))
+	} else {
+		avatarImg = canvas.NewImageFromResource(fyne.NewStaticResource("default", []byte{}))
+	}
+	avatarImg.FillMode = canvas.ImageFillContain
+	avatarImg.SetMinSize(fyne.NewSize(150, 150))
+
+	titleLbl := widget.NewLabelWithStyle(displayName, fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	jidLbl := widget.NewLabelWithStyle(lookupJID, fyne.TextAlignCenter, fyne.TextStyle{Italic: true})
+
+	content := container.NewVBox(
+		container.NewCenter(avatarImg),
+		titleLbl,
+		jidLbl,
+	)
+
+	d := dialog.NewCustom("Chat Info", "Close", content, ui.mainWindow)
+	d.Show()
+}

@@ -77,12 +77,12 @@ func circleMask(src image.Image) image.Image {
 // applyCircularMask takes raw image bytes and returns PNG bytes with a circular crop
 func applyCircularMask(imgData []byte) []byte {
 	if len(imgData) == 0 {
-		return imgData
+		return nil
 	}
 	
 	img, _, err := image.Decode(bytes.NewReader(imgData))
 	if err != nil {
-		return imgData
+		return nil
 	}
 	
 	masked := circleMask(img)
@@ -90,7 +90,7 @@ func applyCircularMask(imgData []byte) []byte {
 	var buf bytes.Buffer
 	err = png.Encode(&buf, masked)
 	if err != nil {
-		return imgData
+		return nil
 	}
 	
 	return buf.Bytes()

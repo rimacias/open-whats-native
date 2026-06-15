@@ -2,7 +2,6 @@ package ui
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -39,9 +38,11 @@ type AppUI struct {
 	allMsgs     []domain.Message
 	filteredMsg []domain.Message
 
-	msgEntry  *widget.Entry
-	sendBtn   *widget.Button
-	chatTitle *widget.Label
+	msgEntry    *widget.Entry
+	sendBtn     *widget.Button
+	chatTitle   *widget.Label
+	chatAvatar  *canvas.Image
+	chatInfoBtn *widget.Button
 
 	searchChat *widget.Entry
 	searchMsg  *widget.Entry
@@ -100,11 +101,13 @@ func (ui *AppUI) Start() {
 				widget.NewLabelWithStyle("Contact Name Placeholder", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 				widget.NewLabel("Last message preview"),
 			)
-			return container.NewHBox(img, vbox)
+			hbox := container.NewHBox(img, vbox)
+			return container.NewPadded(hbox)
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			c := ui.filteredCh[i]
-			hbox := o.(*fyne.Container)
+			padded := o.(*fyne.Container)
+			hbox := padded.Objects[0].(*fyne.Container)
 			img := hbox.Objects[0].(*canvas.Image)
 			vbox := hbox.Objects[1].(*fyne.Container)
 			
@@ -152,7 +155,20 @@ func (ui *AppUI) Start() {
 	ui.chatList.OnSelected = func(id widget.ListItemID) {
 		c := ui.filteredCh[id]
 		ui.activeJID = c.JID
-		ui.chatTitle.SetText(fmt.Sprintf("Chat: %s", c.Name))
+		ui.chatTitle.SetText(c.Name)
+		ui.chatInfoBtn.Show()
+		
+		lookupJID := c.JID
+		if !strings.Contains(lookupJID, "@") {
+			lookupJID += "@s.whatsapp.net"
+		}
+		if av, ok := ui.avatarMap[lookupJID]; ok && len(av) > 0 {
+			ui.chatAvatar.Resource = fyne.NewStaticResource("avatar.png", av)
+		} else {
+			ui.chatAvatar.Resource = fyne.NewStaticResource("default", []byte{})
+		}
+		ui.chatAvatar.Refresh()
+
 		ui.loadChatHistory(c.JID)
 	}
 
@@ -175,15 +191,25 @@ func (ui *AppUI) Start() {
 	)
 
 	// 2. Build Right Side (Chat Area & Search)
-	ui.chatTitle = widget.NewLabelWithStyle("Select a chat to start messaging", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	ui.chatTitle = widget.NewLabelWithStyle("Select a chat to start messaging", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	ui.chatAvatar = canvas.NewImageFromResource(fyne.NewStaticResource("default", []byte{}))
+	ui.chatAvatar.SetMinSize(fyne.NewSize(40, 40))
+	ui.chatAvatar.FillMode = canvas.ImageFillContain
 	
+	ui.chatInfoBtn = widget.NewButton("Info", func() {
+		ui.showChatDetailsDialog()
+	})
+	ui.chatInfoBtn.Hide()
+	
+	headerRow := container.NewBorder(nil, nil, ui.chatAvatar, ui.chatInfoBtn, ui.chatTitle)
+
 	ui.searchMsg = widget.NewEntry()
 	ui.searchMsg.SetPlaceHolder("Search in chat...")
 	ui.searchMsg.OnChanged = func(s string) {
 		ui.filterMessages(s)
 	}
 
-	headerContainer := container.NewVBox(ui.chatTitle, ui.searchMsg)
+	headerContainer := container.NewVBox(headerRow, ui.searchMsg)
 
 	ui.msgVBox = container.NewVBox()
 	ui.msgScroll = container.NewVScroll(ui.msgVBox)
