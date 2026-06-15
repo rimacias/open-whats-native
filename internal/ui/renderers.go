@@ -185,27 +185,38 @@ func wrapText(text string, lineLen int) string {
 			finalLines = append(finalLines, "")
 			continue
 		}
-		var currentLine string
+		
+		var currentLine []rune
 		for _, word := range words {
-			if len([]rune(currentLine))+len([]rune(word))+1 > lineLen {
-				if currentLine != "" {
-					finalLines = append(finalLines, currentLine)
-					currentLine = word
-				} else {
-					// Word itself is longer than lineLen
-					finalLines = append(finalLines, word)
-					currentLine = ""
+			wordRunes := []rune(word)
+			
+			for len(wordRunes) > 0 {
+				spaceLeft := lineLen - len(currentLine)
+				if len(currentLine) > 0 {
+					spaceLeft-- // account for the space character
 				}
-			} else {
-				if currentLine == "" {
-					currentLine = word
+				
+				if len(wordRunes) <= spaceLeft {
+					if len(currentLine) > 0 {
+						currentLine = append(currentLine, ' ')
+					}
+					currentLine = append(currentLine, wordRunes...)
+					break
+				}
+				
+				if len(currentLine) == 0 {
+					// Force break the long word
+					finalLines = append(finalLines, string(wordRunes[:lineLen]))
+					wordRunes = wordRunes[lineLen:]
 				} else {
-					currentLine += " " + word
+					// Push current line and try again
+					finalLines = append(finalLines, string(currentLine))
+					currentLine = nil
 				}
 			}
 		}
-		if currentLine != "" {
-			finalLines = append(finalLines, currentLine)
+		if len(currentLine) > 0 {
+			finalLines = append(finalLines, string(currentLine))
 		}
 	}
 	return strings.Join(finalLines, "\n")
