@@ -16,8 +16,7 @@ open-whats
 # vendor/
 
 # Local databases
-store.db
-store.db-journal
+db/
 
 # Go workspace file
 go.work

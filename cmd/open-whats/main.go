@@ -14,7 +14,7 @@ func main() {
 	ctx := context.Background()
 
 	// 1. Initialize the SQLite store (now includes our local messages table)
-	localStore, err := store.InitDatabase(ctx, "store.db")
+	localStore, err := store.InitDatabase(ctx, "db/store.db")
 	if err != nil {
 		fmt.Printf("Fatal error initializing database: %v\n", err)
 		os.Exit(1)

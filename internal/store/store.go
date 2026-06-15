@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3"
 	"go.mau.fi/whatsmeow/store"
@@ -20,6 +22,10 @@ type LocalStore struct {
 
 // InitDatabase initializes our custom SQLite database and whatsmeow's store.
 func InitDatabase(ctx context.Context, path string) (*LocalStore, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create db directory: %w", err)
+	}
+
 	dsn := fmt.Sprintf("file:%s?_foreign_keys=on", path)
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {

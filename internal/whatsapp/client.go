@@ -88,7 +88,7 @@ func (c *Client) Logout(ctx context.Context) error {
 		return fmt.Errorf("failed to logout: %w", err)
 	}
 	// Attempt to remove the local database file to ensure a clean slate for next login
-	_ = os.Remove("store.db")
+	_ = os.Remove("db/store.db")
 	return nil
 }
 
