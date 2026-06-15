@@ -76,9 +76,18 @@ func (r *StickerMessageRenderer) Render(msg domain.Message, senderName string) f
 }
 
 func buildMessageRow(msg domain.Message, senderName string, content fyne.CanvasObject) fyne.CanvasObject {
-	senderLbl := widget.NewLabelWithStyle(senderName, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	var vboxObjects []fyne.CanvasObject
+	var senderLbl *widget.Label
+
+	if senderName != "" {
+		senderLbl = widget.NewLabelWithStyle(senderName, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+		if msg.IsFromMe {
+			senderLbl.Alignment = fyne.TextAlignTrailing
+		}
+		vboxObjects = append(vboxObjects, senderLbl)
+	}
 	
-	vboxObjects := []fyne.CanvasObject{senderLbl, content}
+	vboxObjects = append(vboxObjects, content)
 
 	if len(msg.Reactions) > 0 {
 		counts := make(map[string]int)
@@ -105,7 +114,6 @@ func buildMessageRow(msg domain.Message, senderName string, content fyne.CanvasO
 	vbox := container.NewVBox(vboxObjects...)
 	
 	if msg.IsFromMe {
-		senderLbl.Alignment = fyne.TextAlignTrailing
 		return container.NewHBox(layout.NewSpacer(), vbox)
 	}
 	

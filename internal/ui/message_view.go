@@ -42,6 +42,7 @@ func (ui *AppUI) filterMessages(query string) {
 
 func (ui *AppUI) refreshMessagesList() {
 	ui.msgVBox.Objects = nil
+	var prevSenderJID string
 	for _, msg := range ui.filteredMsg {
 		// Prepare sender name
 		senderName := msg.SenderJID
@@ -60,8 +61,14 @@ func (ui *AppUI) refreshMessagesList() {
 			}
 		}
 
+		displaySenderName := senderName
+		if msg.SenderJID == prevSenderJID {
+			displaySenderName = ""
+		}
+		prevSenderJID = msg.SenderJID
+
 		renderer := GetMessageRenderer(msg)
-		ui.msgVBox.Add(renderer.Render(msg, senderName))
+		ui.msgVBox.Add(renderer.Render(msg, displaySenderName))
 	}
 	ui.msgVBox.Refresh()
 	if len(ui.filteredMsg) > 0 {
