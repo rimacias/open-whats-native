@@ -92,7 +92,6 @@ func buildMessageRow(msg domain.Message, senderName string, avatarData []byte, c
 			cImg := canvas.NewImageFromReader(imgReader, "avatar")
 			cImg.FillMode = canvas.ImageFillContain
 			cImg.SetMinSize(fyne.NewSize(30, 30))
-			// Square avatar is sufficient since circle masks are complex in fyne
 			headerRow = container.NewHBox(cImg, senderLbl)
 			vboxObjects = append(vboxObjects, headerRow)
 		} else {

@@ -135,7 +135,7 @@ func (ui *AppUI) Start() {
 							data, err := io.ReadAll(resp.Body)
 							resp.Body.Close()
 							if err == nil && len(data) > 0 {
-								ui.avatarMap[jid] = data
+								ui.avatarMap[jid] = applyCircularMask(data)
 								fyne.Do(func() {
 									ui.chatList.RefreshItem(i)
 								})

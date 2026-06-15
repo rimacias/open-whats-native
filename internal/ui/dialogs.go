@@ -106,7 +106,9 @@ func (ui *AppUI) logout() {
 			// Close the app after a short delay so they can read the dialog
 			go func() {
 				time.Sleep(3 * time.Second)
-				ui.fyneApp.Quit()
+				fyne.Do(func() {
+					ui.fyneApp.Quit()
+				})
 			}()
 		}
 	}, ui.mainWindow)
