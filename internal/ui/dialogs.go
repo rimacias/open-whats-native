@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -129,4 +130,49 @@ func (ui *AppUI) showQRCode(code string) {
 		ui.qrDialog = dialog.NewCustom("Login Required", "Close", content, ui.mainWindow)
 		ui.qrDialog.Show()
 	}
+}
+
+func (ui *AppUI) showAttachDialog() {
+	if ui.activeJID == "" {
+		dialog.ShowInformation("No Chat", "Please select a chat before attaching a file.", ui.mainWindow)
+		return
+	}
+
+	d := dialog.NewFileOpen(func(uc fyne.URIReadCloser, err error) {
+		if err != nil || uc == nil {
+			return
+		}
+		defer uc.Close()
+
+		// Read the file data
+		data, err := io.ReadAll(uc)
+		if err != nil {
+			dialog.ShowError(err, ui.mainWindow)
+			return
+		}
+
+		// Basic MIME type detection
+		mimeType := "image/jpeg"
+		ext := strings.ToLower(uc.URI().Extension())
+		if ext == ".png" {
+			mimeType = "image/png"
+		} else if ext == ".webp" {
+			mimeType = "image/webp"
+		}
+
+		go func() {
+			err := ui.client.SendImage(context.Background(), ui.activeJID, data, mimeType)
+			if err != nil {
+				fmt.Println("Error sending image:", err)
+			} else {
+				// We reload history to update UI, or we can just fetch the new message.
+				// For simplicity, reload history
+				ui.loadChatHistory(ui.activeJID)
+				ui.updateChatPreview(ui.activeJID, "📷 Photo", time.Now())
+			}
+		}()
+	}, ui.mainWindow)
+
+	// Set file filter if needed
+	d.Show()
 }

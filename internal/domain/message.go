@@ -24,6 +24,7 @@ type Message struct {
 	SenderName string // Added to store push name
 	Text      string
 	IsSticker bool
+	IsImage   bool
 	MediaURL  string
 	Reactions []Reaction
 	Timestamp time.Time
@@ -41,6 +42,7 @@ type ChatPreview struct {
 // WhatsAppClient defines the behavior for the WhatsApp integration.
 type WhatsAppClient interface {
 	SendMessage(ctx context.Context, jid string, text string) error
+	SendImage(ctx context.Context, jid string, data []byte, mimeType string) error
 	GetContacts(ctx context.Context) ([]Contact, error)
 	RegisterMessageCallback(callback func(msg Message))
 	RegisterLoginCallbacks(onQR func(code string), onLogin func())

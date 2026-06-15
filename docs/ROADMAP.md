@@ -31,16 +31,16 @@ The foundational architecture of the application has been stabilized using Go, F
 The following plan breaks down the features required to match official WhatsApp Web capabilities.
 
 ### Phase 1: Rich Media & Attachments
-**1. Rendering Images & Photos**
+**1. Rendering Images & Photos** [x]
 - *Description*: Handle standard photo messages (`*waE2E.ImageMessage`) sent in chats.
 - *Implementation*: Extend `whatsmeow`'s `Download()` method. Use Fyne's `canvas.NewImageFromReader` to natively display them within the Strategy pattern `MessageRenderer`.
 - *Storage*: Cache media bytes locally in a dedicated media directory to avoid re-downloading.
 
-**2. Sending Attachments (Photos/Videos/Docs)**
+**2. Sending Attachments (Photos/Videos/Docs)** [x] (Photos)
 - *Description*: Add an "Attach" button (+) next to the text input.
 - *Implementation*: Open a Fyne `dialog.NewFileOpen`. Upload the file to WhatsApp servers using `client.Upload(context, data, type)` and wrap the resulting URL in a `*waE2E.Message`.
 
-**3. Video Rendering**
+**3. Video Rendering** [ ]
 - *Description*: Play received `.mp4` video messages.
 - *Implementation*: Fyne does not natively play videos. We will need to render a video thumbnail and provide a "Click to open externally" button, or integrate a third-party Go binding for video playback.
 

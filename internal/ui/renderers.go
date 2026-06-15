@@ -112,10 +112,42 @@ func buildMessageRow(msg domain.Message, senderName string, content fyne.CanvasO
 	return container.NewHBox(vbox, layout.NewSpacer())
 }
 
+// ImageMessageRenderer renders photo/image messages
+type ImageMessageRenderer struct{}
+
+func (r *ImageMessageRenderer) Render(msg domain.Message, senderName string) fyne.CanvasObject {
+	var content fyne.CanvasObject
+
+	if msg.MediaURL == "" {
+		content = widget.NewLabel("[Image Error]")
+	} else {
+		// Extract base64 part
+		parts := strings.Split(msg.MediaURL, ",")
+		if len(parts) != 2 {
+			content = widget.NewLabel("[Image Error: Invalid Data]")
+		} else {
+			data, err := base64.StdEncoding.DecodeString(parts[1])
+			if err != nil {
+				content = widget.NewLabel("[Image Error: Decode Failed]")
+			} else {
+				imgReader := strings.NewReader(string(data))
+				cImg := canvas.NewImageFromReader(imgReader, "image")
+				cImg.FillMode = canvas.ImageFillContain
+				cImg.SetMinSize(fyne.NewSize(200, 200))
+				content = cImg
+			}
+		}
+	}
+
+	return buildMessageRow(msg, senderName, content)
+}
+
 // GetMessageRenderer acts as a factory returning the correct rendering strategy
 func GetMessageRenderer(msg domain.Message) MessageRenderer {
 	if msg.IsSticker {
 		return &StickerMessageRenderer{}
+	} else if msg.IsImage {
+		return &ImageMessageRenderer{}
 	}
 	return &TextMessageRenderer{}
 }

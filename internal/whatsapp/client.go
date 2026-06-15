@@ -134,6 +134,50 @@ func (c *Client) SendMessage(ctx context.Context, jid string, text string) error
 	return nil
 }
 
+// SendImage implements domain.WhatsAppClient
+func (c *Client) SendImage(ctx context.Context, jid string, data []byte, mimeType string) error {
+	targetJID, err := types.ParseJID(jid)
+	if err != nil {
+		return fmt.Errorf("invalid JID: %w", err)
+	}
+
+	resp, err := c.client.Upload(ctx, data, whatsmeow.MediaImage)
+	if err != nil {
+		return fmt.Errorf("failed to upload image: %w", err)
+	}
+
+	msg := &waE2E.Message{
+		ImageMessage: &waE2E.ImageMessage{
+			URL:           proto.String(resp.URL),
+			DirectPath:    proto.String(resp.DirectPath),
+			MediaKey:      resp.MediaKey,
+			Mimetype:      proto.String(mimeType),
+			FileEncSHA256: resp.FileEncSHA256,
+			FileSHA256:    resp.FileSHA256,
+			FileLength:    proto.Uint64(uint64(len(data))),
+		},
+	}
+
+	sendResp, err := c.client.SendMessage(ctx, targetJID, msg)
+	if err != nil {
+		return fmt.Errorf("failed to send image message: %w", err)
+	}
+
+	c.msgStore.SaveMessage(ctx, domain.Message{
+		ID:        sendResp.ID,
+		ChatJID:   targetJID.ToNonAD().String(),
+		SenderJID: c.client.Store.ID.ToNonAD().String(),
+		Text:      "",
+		IsSticker: false,
+		IsImage:   true,
+		MediaURL:  "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data),
+		Timestamp: sendResp.Timestamp,
+		IsFromMe:  true,
+	})
+
+	return nil
+}
+
 // GetContacts implements domain.WhatsAppClient
 func (c *Client) GetContacts(ctx context.Context) ([]domain.Contact, error) {
 	if c.client.Store.ID == nil {
@@ -233,6 +277,7 @@ func (c *Client) eventHandler(evt interface{}) {
 
 		var text string
 		var isSticker bool
+		var isImage bool
 		var mediaURL string
 
 		if v.Message.GetConversation() != "" {
@@ -245,9 +290,20 @@ func (c *Client) eventHandler(evt interface{}) {
 			if err == nil {
 				mediaURL = "data:image/webp;base64," + base64.StdEncoding.EncodeToString(data)
 			}
+		} else if v.Message.GetImageMessage() != nil {
+			isImage = true
+			data, err := c.client.Download(context.Background(), v.Message.GetImageMessage())
+			if err == nil {
+				// We'll store it as jpeg/png depending on what it is, but data URI will work with image/jpeg generally or image/png. Let's use image/jpeg for whatsapp images by default or just use the mimetype from the message
+				mime := v.Message.GetImageMessage().GetMimetype()
+				if mime == "" {
+					mime = "image/jpeg"
+				}
+				mediaURL = "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
+			}
 		}
 
-		if text != "" || isSticker {
+		if text != "" || isSticker || isImage {
 			chatJID := v.Info.Chat.ToNonAD().String()
 			
 			domainMsg := domain.Message{
@@ -256,10 +312,11 @@ func (c *Client) eventHandler(evt interface{}) {
 				SenderJID:  v.Info.Sender.ToNonAD().String(),
 				SenderName: v.Info.PushName,
 				Text:       text,
-				IsSticker: isSticker,
-				MediaURL:  mediaURL,
-				Timestamp: v.Info.Timestamp,
-				IsFromMe:  v.Info.IsFromMe,
+				IsSticker:  isSticker,
+				IsImage:    isImage,
+				MediaURL:   mediaURL,
+				Timestamp:  v.Info.Timestamp,
+				IsFromMe:   v.Info.IsFromMe,
 			}
 
 			// Store it locally so history is maintained
@@ -285,6 +342,7 @@ func (c *Client) eventHandler(evt interface{}) {
 				msgData := historyMsg.GetMessage().GetMessage()
 				var text string
 				var isSticker bool
+				var isImage bool
 				var mediaURL string
 				
 				if msgData.GetConversation() != "" {
@@ -297,9 +355,19 @@ func (c *Client) eventHandler(evt interface{}) {
 					if err == nil {
 						mediaURL = "data:image/webp;base64," + base64.StdEncoding.EncodeToString(data)
 					}
+				} else if msgData.GetImageMessage() != nil {
+					isImage = true
+					data, err := c.client.Download(context.Background(), msgData.GetImageMessage())
+					if err == nil {
+						mime := msgData.GetImageMessage().GetMimetype()
+						if mime == "" {
+							mime = "image/jpeg"
+						}
+						mediaURL = "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
+					}
 				}
 
-				if text != "" || isSticker {
+				if text != "" || isSticker || isImage {
 					info := historyMsg.GetMessage()
 					isFromMe := info.GetKey().GetFromMe()
 					senderJID := chatJID.ToNonAD().String()
@@ -334,6 +402,7 @@ func (c *Client) eventHandler(evt interface{}) {
 						SenderName: info.GetPushName(),
 						Text:       text,
 						IsSticker:  isSticker,
+						IsImage:    isImage,
 						MediaURL:   mediaURL,
 						Reactions:  reactions,
 						Timestamp:  time.Unix(int64(info.GetMessageTimestamp()), 0),

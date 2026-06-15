@@ -68,6 +68,7 @@ func initTables(ctx context.Context, db *sql.DB) error {
 		sender_jid TEXT NOT NULL,
 		text TEXT,
 		is_sticker BOOLEAN,
+		is_image BOOLEAN,
 		media_url TEXT,
 		timestamp DATETIME,
 		is_from_me BOOLEAN,
@@ -79,9 +80,10 @@ func initTables(ctx context.Context, db *sql.DB) error {
 	`
 	_, err := db.ExecContext(ctx, query)
 	
-	// Migration: Add sender_name and reactions if missing
+	// Migration: Add sender_name, reactions, and is_image if missing
 	_, _ = db.ExecContext(ctx, "ALTER TABLE messages ADD COLUMN sender_name TEXT")
 	_, _ = db.ExecContext(ctx, "ALTER TABLE messages ADD COLUMN reactions TEXT")
+	_, _ = db.ExecContext(ctx, "ALTER TABLE messages ADD COLUMN is_image BOOLEAN DEFAULT 0")
 	
 	return err
 }
@@ -94,11 +96,11 @@ func (ls *LocalStore) GetDevice() *store.Device {
 func (ls *LocalStore) SaveMessage(ctx context.Context, msg domain.Message) error {
 	reactionsJSON, _ := json.Marshal(msg.Reactions)
 	query := `
-		INSERT OR REPLACE INTO messages (id, chat_jid, sender_jid, sender_name, text, is_sticker, media_url, timestamp, is_from_me, reactions)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT OR REPLACE INTO messages (id, chat_jid, sender_jid, sender_name, text, is_sticker, is_image, media_url, timestamp, is_from_me, reactions)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := ls.db.ExecContext(ctx, query,
-		msg.ID, msg.ChatJID, msg.SenderJID, msg.SenderName, msg.Text, msg.IsSticker, msg.MediaURL, msg.Timestamp, msg.IsFromMe, string(reactionsJSON),
+		msg.ID, msg.ChatJID, msg.SenderJID, msg.SenderName, msg.Text, msg.IsSticker, msg.IsImage, msg.MediaURL, msg.Timestamp, msg.IsFromMe, string(reactionsJSON),
 	)
 	return err
 }
@@ -106,7 +108,7 @@ func (ls *LocalStore) SaveMessage(ctx context.Context, msg domain.Message) error
 // GetMessages implements domain.MessageStore
 func (ls *LocalStore) GetMessages(ctx context.Context, chatJID string, limit int) ([]domain.Message, error) {
 	query := `
-		SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, media_url, timestamp, is_from_me, reactions
+		SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, is_image, media_url, timestamp, is_from_me, reactions
 		FROM messages
 		WHERE chat_jid = ?
 		ORDER BY timestamp ASC
@@ -123,7 +125,7 @@ func (ls *LocalStore) GetMessages(ctx context.Context, chatJID string, limit int
 		var m domain.Message
 		var nullSenderName sql.NullString
 		var nullReactions sql.NullString
-		err := rows.Scan(&m.ID, &m.ChatJID, &m.SenderJID, &nullSenderName, &m.Text, &m.IsSticker, &m.MediaURL, &m.Timestamp, &m.IsFromMe, &nullReactions)
+		err := rows.Scan(&m.ID, &m.ChatJID, &m.SenderJID, &nullSenderName, &m.Text, &m.IsSticker, &m.IsImage, &m.MediaURL, &m.Timestamp, &m.IsFromMe, &nullReactions)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +143,7 @@ func (ls *LocalStore) GetMessages(ctx context.Context, chatJID string, limit int
 // GetMessage implements domain.MessageStore
 func (ls *LocalStore) GetMessage(ctx context.Context, id string) (*domain.Message, error) {
 	query := `
-		SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, media_url, timestamp, is_from_me, reactions
+		SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, is_image, media_url, timestamp, is_from_me, reactions
 		FROM messages
 		WHERE id = ?
 	`
@@ -150,7 +152,7 @@ func (ls *LocalStore) GetMessage(ctx context.Context, id string) (*domain.Messag
 	var m domain.Message
 	var nullSenderName sql.NullString
 	var nullReactions sql.NullString
-	err := row.Scan(&m.ID, &m.ChatJID, &m.SenderJID, &nullSenderName, &m.Text, &m.IsSticker, &m.MediaURL, &m.Timestamp, &m.IsFromMe, &nullReactions)
+	err := row.Scan(&m.ID, &m.ChatJID, &m.SenderJID, &nullSenderName, &m.Text, &m.IsSticker, &m.IsImage, &m.MediaURL, &m.Timestamp, &m.IsFromMe, &nullReactions)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -177,9 +179,9 @@ func (ls *LocalStore) UpdateMessageReactions(ctx context.Context, id string, rea
 // GetChats implements domain.MessageStore
 func (ls *LocalStore) GetChats(ctx context.Context) ([]domain.ChatPreview, error) {
 	query := `
-		SELECT chat_jid, text, is_sticker, timestamp
+		SELECT chat_jid, text, is_sticker, is_image, timestamp
 		FROM (
-			SELECT chat_jid, text, is_sticker, timestamp,
+			SELECT chat_jid, text, is_sticker, is_image, timestamp,
 				   ROW_NUMBER() OVER (PARTITION BY chat_jid ORDER BY timestamp DESC) as rn
 			FROM messages
 		)
@@ -195,13 +197,15 @@ func (ls *LocalStore) GetChats(ctx context.Context) ([]domain.ChatPreview, error
 	var chats []domain.ChatPreview
 	for rows.Next() {
 		var chat domain.ChatPreview
-		var isSticker bool
-		err := rows.Scan(&chat.JID, &chat.LastMsg, &isSticker, &chat.Timestamp)
+		var isSticker, isImage bool
+		err := rows.Scan(&chat.JID, &chat.LastMsg, &isSticker, &isImage, &chat.Timestamp)
 		if err != nil {
 			return nil, err
 		}
 		if isSticker {
 			chat.LastMsg = "🖼️ Sticker"
+		} else if isImage {
+			chat.LastMsg = "📷 Photo"
 		}
 		chats = append(chats, chat)
 	}

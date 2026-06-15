@@ -146,7 +146,11 @@ func (ui *AppUI) Start() {
 		ui.sendMessage()
 	})
 
-	inputArea := container.NewBorder(nil, nil, nil, ui.sendBtn, ui.msgEntry)
+	attachBtn := widget.NewButton("+", func() {
+		ui.showAttachDialog()
+	})
+
+	inputArea := container.NewBorder(nil, nil, attachBtn, ui.sendBtn, ui.msgEntry)
 
 	rightPanel := container.NewBorder(
 		headerContainer,
