@@ -89,7 +89,7 @@ func buildMessageRow(msg domain.Message, senderName string, avatarData []byte, c
 		
 		if len(avatarData) > 0 && !msg.IsFromMe {
 			imgReader := strings.NewReader(string(avatarData))
-			cImg := canvas.NewImageFromReader(imgReader, "avatar")
+			cImg := canvas.NewImageFromReader(imgReader, "avatar.png")
 			cImg.FillMode = canvas.ImageFillContain
 			cImg.SetMinSize(fyne.NewSize(30, 30))
 			headerRow = container.NewHBox(cImg, senderLbl)

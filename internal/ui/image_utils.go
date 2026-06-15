@@ -8,6 +8,8 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"math"
+
+	_ "golang.org/x/image/webp"
 )
 
 // circleMask generates a circular mask and applies it to the given image.

@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"image/color"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"open-whats/internal/domain"
 )
 
@@ -102,14 +104,16 @@ func (ui *AppUI) refreshMessagesList() {
 					if err == nil && url != "" {
 						resp, err := http.Get(url)
 						if err == nil {
-							data, err := io.ReadAll(resp.Body)
-							resp.Body.Close()
-							if err == nil && len(data) > 0 {
-								ui.avatarMap[jid] = applyCircularMask(data)
-								fyne.Do(func() {
-									ui.refreshMessagesList()
-								})
+							if resp.StatusCode == 200 {
+								data, err := io.ReadAll(resp.Body)
+								if err == nil && len(data) > 0 {
+									ui.avatarMap[jid] = applyCircularMask(data)
+									fyne.Do(func() {
+										ui.refreshMessagesList()
+									})
+								}
 							}
+							resp.Body.Close()
 						}
 					}
 				}(lookupJID)
@@ -118,6 +122,11 @@ func (ui *AppUI) refreshMessagesList() {
 
 		renderer := GetMessageRenderer(msg)
 		ui.msgVBox.Add(renderer.Render(msg, displaySenderName, avatar))
+		
+		// Add y-padding
+		spacer := canvas.NewRectangle(color.Transparent)
+		spacer.SetMinSize(fyne.NewSize(1, 10))
+		ui.msgVBox.Add(spacer)
 	}
 	ui.msgVBox.Refresh()
 	if len(ui.filteredMsg) > 0 {

@@ -132,14 +132,16 @@ func (ui *AppUI) Start() {
 					if err == nil && url != "" {
 						resp, err := http.Get(url)
 						if err == nil {
-							data, err := io.ReadAll(resp.Body)
-							resp.Body.Close()
-							if err == nil && len(data) > 0 {
-								ui.avatarMap[jid] = applyCircularMask(data)
-								fyne.Do(func() {
-									ui.chatList.RefreshItem(i)
-								})
+							if resp.StatusCode == 200 {
+								data, err := io.ReadAll(resp.Body)
+								if err == nil && len(data) > 0 {
+									ui.avatarMap[jid] = applyCircularMask(data)
+									fyne.Do(func() {
+										ui.chatList.RefreshItem(i)
+									})
+								}
 							}
+							resp.Body.Close()
 						}
 					}
 				}(lookupJID)
