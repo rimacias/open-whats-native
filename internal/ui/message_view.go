@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"fyne.io/fyne/v2"
 	"open-whats/internal/domain"
 )
 
@@ -99,10 +100,26 @@ func (ui *AppUI) sendMessage() {
 }
 
 func (ui *AppUI) onMessageReceived(msg domain.Message) {
-	ui.updateChatPreview(msg.ChatJID, msg.Text, msg.Timestamp)
+	fyne.Do(func() {
+		// Let chat_list handle updating the sidebar
+		ui.updateChatPreview(msg.ChatJID, msg.Text, msg.Timestamp)
 
-	if msg.ChatJID == ui.activeJID {
-		ui.allMsgs = append(ui.allMsgs, msg)
+		if msg.ChatJID != ui.activeJID {
+			return
+		}
+		
+		updated := false
+		for i, m := range ui.allMsgs {
+			if m.ID == msg.ID {
+				ui.allMsgs[i] = msg
+				updated = true
+				break
+			}
+		}
+		if !updated {
+			ui.allMsgs = append(ui.allMsgs, msg)
+		}
+		
 		ui.filterMessages(ui.searchMsg.Text)
-	}
+	})
 }

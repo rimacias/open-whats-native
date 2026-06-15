@@ -6,12 +6,17 @@ import (
 	"strings"
 	"time"
 
+	"fyne.io/fyne/v2"
 	"open-whats/internal/domain"
 )
 
 func (ui *AppUI) fetchChats() {
-	ui.syncContainer.Show()
-	defer ui.syncContainer.Hide()
+	if !ui.client.IsLoggedIn() {
+		return
+	}
+	
+	fyne.Do(func() { ui.syncContainer.Show() })
+	defer fyne.Do(func() { ui.syncContainer.Hide() })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -41,9 +46,11 @@ func (ui *AppUI) fetchChats() {
 		}
 	}
 
-	ui.allChats = chats
-	ui.filteredCh = chats
-	ui.chatList.Refresh()
+	fyne.Do(func() {
+		ui.allChats = chats
+		ui.filteredCh = chats
+		ui.chatList.Refresh()
+	})
 }
 
 func (ui *AppUI) filterChats(query string) {

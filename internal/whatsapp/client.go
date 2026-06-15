@@ -3,7 +3,6 @@ package whatsapp
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"go.mau.fi/whatsmeow"
@@ -30,6 +29,9 @@ type Client struct {
 
 // NewClient creates a new whatsapp client adapter
 func NewClient(deviceStore *store.Device, msgStore domain.MessageStore) *Client {
+	// Set the device name that appears in the user's phone "Linked Devices" list
+	store.DeviceProps.Os = proto.String("openWhats")
+	
 	clientLog := waLog.Stdout("Client", "DEBUG", true)
 	client := whatsmeow.NewClient(deviceStore, clientLog)
 	
@@ -81,14 +83,24 @@ func (c *Client) Disconnect() {
 	c.client.Disconnect()
 }
 
+// IsLoggedIn implements domain.WhatsAppClient
+func (c *Client) IsLoggedIn() bool {
+	return c.client.Store.ID != nil
+}
+
 // Logout implements domain.WhatsAppClient
 func (c *Client) Logout(ctx context.Context) error {
 	err := c.client.Logout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to logout: %w", err)
 	}
-	// Attempt to remove the local database file to ensure a clean slate for next login
-	_ = os.Remove("db/store.db")
+	
+	// Explicitly clear local app tables since we cannot reliably delete an open SQLite file
+	if c.msgStore != nil {
+		c.msgStore.ClearAllData(ctx)
+	}
+	
+	// We no longer attempt os.Remove("db/store.db") here because SQLite holds a lock.
 	return nil
 }
 
@@ -178,6 +190,47 @@ func (c *Client) RegisterSyncCallback(onSync func(isSyncing bool)) {
 func (c *Client) eventHandler(evt interface{}) {
 	switch v := evt.(type) {
 	case *events.Message:
+		if v.Info.Category == "peer" {
+			return
+		}
+
+		// Handle live reactions
+		if v.Message.GetReactionMessage() != nil {
+			reaction := v.Message.GetReactionMessage()
+			targetMsgID := reaction.GetKey().GetID()
+			senderJID := v.Info.Sender.ToNonAD().String()
+			emoji := reaction.GetText()
+
+			ctx := context.Background()
+			msg, err := c.msgStore.GetMessage(ctx, targetMsgID)
+			if err == nil && msg != nil {
+				found := false
+				for i, r := range msg.Reactions {
+					if r.SenderJID == senderJID {
+						if emoji == "" {
+							msg.Reactions = append(msg.Reactions[:i], msg.Reactions[i+1:]...)
+						} else {
+							msg.Reactions[i].Emoji = emoji
+						}
+						found = true
+						break
+					}
+				}
+				if !found && emoji != "" {
+					msg.Reactions = append(msg.Reactions, domain.Reaction{
+						SenderJID: senderJID,
+						Emoji:     emoji,
+					})
+				}
+				c.msgStore.UpdateMessageReactions(ctx, targetMsgID, msg.Reactions)
+				// Trigger UI update
+				if c.messageCallback != nil {
+					c.messageCallback(*msg)
+				}
+			}
+			return
+		}
+
 		var text string
 		var isSticker bool
 		var mediaURL string
@@ -262,16 +315,29 @@ func (c *Client) eventHandler(evt interface{}) {
 						}
 					}
 
+					var reactions []domain.Reaction
+					for _, r := range info.GetReactions() {
+						sender := r.GetKey().GetParticipant()
+						if sender == "" && r.GetKey().GetFromMe() && c.client.Store.ID != nil {
+							sender = c.client.Store.ID.ToNonAD().String()
+						}
+						reactions = append(reactions, domain.Reaction{
+							SenderJID: sender,
+							Emoji:     r.GetText(),
+						})
+					}
+
 					domainMsg := domain.Message{
-						ID:        info.GetKey().GetID(),
-						ChatJID:   chatJID.ToNonAD().String(),
-						SenderJID: senderJID,
+						ID:         info.GetKey().GetID(),
+						ChatJID:    chatJID.ToNonAD().String(),
+						SenderJID:  senderJID,
 						SenderName: info.GetPushName(),
-						Text:      text,
-						IsSticker: isSticker,
-						MediaURL:  mediaURL,
-						Timestamp: time.Unix(int64(info.GetMessageTimestamp()), 0),
-						IsFromMe:  isFromMe,
+						Text:       text,
+						IsSticker:  isSticker,
+						MediaURL:   mediaURL,
+						Reactions:  reactions,
+						Timestamp:  time.Unix(int64(info.GetMessageTimestamp()), 0),
+						IsFromMe:   isFromMe,
 					}
 					c.msgStore.SaveMessage(context.Background(), domainMsg)
 				}

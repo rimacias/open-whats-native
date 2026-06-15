@@ -5,7 +5,9 @@ go 1.26.4
 require (
 	fyne.io/fyne/v2 v2.7.4
 	github.com/mattn/go-sqlite3 v1.14.45
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	go.mau.fi/whatsmeow v0.0.0-20260611094716-089932318bc2
+	golang.org/x/image v0.42.0
 	google.golang.org/protobuf v1.36.11
 )
 
@@ -44,7 +46,6 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
-	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
@@ -54,7 +55,6 @@ require (
 	go.mau.fi/util v0.9.9 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20260508232706-74f9aab9d74a // indirect
-	golang.org/x/image v0.42.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/base64"
+	"fmt"
 	"image/color"
 	"strings"
 
@@ -41,7 +42,7 @@ func (r *TextMessageRenderer) Render(msg domain.Message, senderName string) fyne
 	paddedText := container.NewPadded(textLbl)
 	bubble := container.NewStack(bg, paddedText)
 
-	return buildMessageRow(msg.IsFromMe, senderName, bubble)
+	return buildMessageRow(msg, senderName, bubble)
 }
 
 // StickerMessageRenderer renders webp stickers
@@ -71,15 +72,39 @@ func (r *StickerMessageRenderer) Render(msg domain.Message, senderName string) f
 		}
 	}
 
-	return buildMessageRow(msg.IsFromMe, senderName, content)
+	return buildMessageRow(msg, senderName, content)
 }
 
-func buildMessageRow(isFromMe bool, senderName string, content fyne.CanvasObject) fyne.CanvasObject {
+func buildMessageRow(msg domain.Message, senderName string, content fyne.CanvasObject) fyne.CanvasObject {
 	senderLbl := widget.NewLabelWithStyle(senderName, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	
-	vbox := container.NewVBox(senderLbl, content)
+	vboxObjects := []fyne.CanvasObject{senderLbl, content}
+
+	if len(msg.Reactions) > 0 {
+		counts := make(map[string]int)
+		for _, r := range msg.Reactions {
+			counts[r.Emoji]++
+		}
+		var emojis []fyne.CanvasObject
+		for emoji, count := range counts {
+			text := emoji
+			if count > 1 {
+				text = fmt.Sprintf("%s %d", emoji, count)
+			}
+			lbl := widget.NewLabel(text)
+			emojis = append(emojis, lbl)
+		}
+		
+		reactionBox := container.NewHBox(emojis...)
+		if msg.IsFromMe {
+			reactionBox = container.NewHBox(layout.NewSpacer(), reactionBox)
+		}
+		vboxObjects = append(vboxObjects, reactionBox)
+	}
 	
-	if isFromMe {
+	vbox := container.NewVBox(vboxObjects...)
+	
+	if msg.IsFromMe {
 		senderLbl.Alignment = fyne.TextAlignTrailing
 		return container.NewHBox(layout.NewSpacer(), vbox)
 	}

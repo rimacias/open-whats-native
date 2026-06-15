@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"open-whats/internal/store"
 	"open-whats/internal/ui"
@@ -13,8 +14,19 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// 1. Initialize the SQLite store (now includes our local messages table)
-	localStore, err := store.InitDatabase(ctx, "db/store.db")
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		configDir = "."
+	}
+	appDir := filepath.Join(configDir, "open-whats")
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		fmt.Printf("Fatal error creating config directory: %v\n", err)
+		os.Exit(1)
+	}
+	dbPath := filepath.Join(appDir, "store.db")
+
+	// 1. Initialize the SQLite store
+	localStore, err := store.InitDatabase(ctx, dbPath)
 	if err != nil {
 		fmt.Printf("Fatal error initializing database: %v\n", err)
 		os.Exit(1)

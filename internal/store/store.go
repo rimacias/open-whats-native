@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,15 +71,17 @@ func initTables(ctx context.Context, db *sql.DB) error {
 		media_url TEXT,
 		timestamp DATETIME,
 		is_from_me BOOLEAN,
-		sender_name TEXT
+		sender_name TEXT,
+		reactions TEXT
 	);
 	CREATE INDEX IF NOT EXISTS idx_messages_chat_jid ON messages(chat_jid);
 	CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 	`
 	_, err := db.ExecContext(ctx, query)
 	
-	// Migration: Add sender_name if missing
+	// Migration: Add sender_name and reactions if missing
 	_, _ = db.ExecContext(ctx, "ALTER TABLE messages ADD COLUMN sender_name TEXT")
+	_, _ = db.ExecContext(ctx, "ALTER TABLE messages ADD COLUMN reactions TEXT")
 	
 	return err
 }
@@ -89,12 +92,13 @@ func (ls *LocalStore) GetDevice() *store.Device {
 
 // SaveMessage implements domain.MessageStore
 func (ls *LocalStore) SaveMessage(ctx context.Context, msg domain.Message) error {
+	reactionsJSON, _ := json.Marshal(msg.Reactions)
 	query := `
-		INSERT OR IGNORE INTO messages (id, chat_jid, sender_jid, sender_name, text, is_sticker, media_url, timestamp, is_from_me)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT OR REPLACE INTO messages (id, chat_jid, sender_jid, sender_name, text, is_sticker, media_url, timestamp, is_from_me, reactions)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := ls.db.ExecContext(ctx, query,
-		msg.ID, msg.ChatJID, msg.SenderJID, msg.SenderName, msg.Text, msg.IsSticker, msg.MediaURL, msg.Timestamp, msg.IsFromMe,
+		msg.ID, msg.ChatJID, msg.SenderJID, msg.SenderName, msg.Text, msg.IsSticker, msg.MediaURL, msg.Timestamp, msg.IsFromMe, string(reactionsJSON),
 	)
 	return err
 }
@@ -102,7 +106,7 @@ func (ls *LocalStore) SaveMessage(ctx context.Context, msg domain.Message) error
 // GetMessages implements domain.MessageStore
 func (ls *LocalStore) GetMessages(ctx context.Context, chatJID string, limit int) ([]domain.Message, error) {
 	query := `
-		SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, media_url, timestamp, is_from_me
+		SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, media_url, timestamp, is_from_me, reactions
 		FROM messages
 		WHERE chat_jid = ?
 		ORDER BY timestamp ASC
@@ -118,16 +122,56 @@ func (ls *LocalStore) GetMessages(ctx context.Context, chatJID string, limit int
 	for rows.Next() {
 		var m domain.Message
 		var nullSenderName sql.NullString
-		err := rows.Scan(&m.ID, &m.ChatJID, &m.SenderJID, &nullSenderName, &m.Text, &m.IsSticker, &m.MediaURL, &m.Timestamp, &m.IsFromMe)
+		var nullReactions sql.NullString
+		err := rows.Scan(&m.ID, &m.ChatJID, &m.SenderJID, &nullSenderName, &m.Text, &m.IsSticker, &m.MediaURL, &m.Timestamp, &m.IsFromMe, &nullReactions)
 		if err != nil {
 			return nil, err
 		}
 		if nullSenderName.Valid {
 			m.SenderName = nullSenderName.String
 		}
+		if nullReactions.Valid && nullReactions.String != "" {
+			json.Unmarshal([]byte(nullReactions.String), &m.Reactions)
+		}
 		msgs = append(msgs, m)
 	}
 	return msgs, nil
+}
+
+// GetMessage implements domain.MessageStore
+func (ls *LocalStore) GetMessage(ctx context.Context, id string) (*domain.Message, error) {
+	query := `
+		SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, media_url, timestamp, is_from_me, reactions
+		FROM messages
+		WHERE id = ?
+	`
+	row := ls.db.QueryRowContext(ctx, query, id)
+
+	var m domain.Message
+	var nullSenderName sql.NullString
+	var nullReactions sql.NullString
+	err := row.Scan(&m.ID, &m.ChatJID, &m.SenderJID, &nullSenderName, &m.Text, &m.IsSticker, &m.MediaURL, &m.Timestamp, &m.IsFromMe, &nullReactions)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if nullSenderName.Valid {
+		m.SenderName = nullSenderName.String
+	}
+	if nullReactions.Valid && nullReactions.String != "" {
+		json.Unmarshal([]byte(nullReactions.String), &m.Reactions)
+	}
+	return &m, nil
+}
+
+// UpdateMessageReactions implements domain.MessageStore
+func (ls *LocalStore) UpdateMessageReactions(ctx context.Context, id string, reactions []domain.Reaction) error {
+	reactionsJSON, _ := json.Marshal(reactions)
+	query := `UPDATE messages SET reactions = ? WHERE id = ?`
+	_, err := ls.db.ExecContext(ctx, query, string(reactionsJSON), id)
+	return err
 }
 
 // GetChats implements domain.MessageStore
@@ -161,5 +205,16 @@ func (ls *LocalStore) GetChats(ctx context.Context) ([]domain.ChatPreview, error
 		}
 		chats = append(chats, chat)
 	}
+
 	return chats, nil
+}
+
+// ClearAllData implements domain.MessageStore
+func (ls *LocalStore) ClearAllData(ctx context.Context) error {
+	_, err := ls.db.ExecContext(ctx, "DELETE FROM messages")
+	if err != nil {
+		return err
+	}
+	_, err = ls.db.ExecContext(ctx, "DELETE FROM contacts")
+	return err
 }

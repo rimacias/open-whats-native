@@ -176,11 +176,13 @@ func (ui *AppUI) onLoginSuccess() {
 }
 
 func (ui *AppUI) onSync(isSyncing bool) {
-	if isSyncing {
-		ui.syncContainer.Show()
-	} else {
-		ui.syncContainer.Hide()
-		// Refresh chats after a sync payload
-		go ui.fetchChats()
-	}
+	fyne.Do(func() {
+		if isSyncing {
+			ui.syncContainer.Show()
+		} else {
+			ui.syncContainer.Hide()
+			// Refresh chats after a sync payload
+			go ui.fetchChats()
+		}
+	})
 }

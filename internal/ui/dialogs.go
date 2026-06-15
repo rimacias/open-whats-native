@@ -90,6 +90,17 @@ func (ui *AppUI) logout() {
 				dialog.ShowError(err, ui.mainWindow)
 				return
 			}
+			
+			// Clear UI state immediately
+			ui.allChats = nil
+			ui.filteredCh = nil
+			ui.allMsgs = nil
+			ui.filteredMsg = nil
+			ui.chatList.Refresh()
+			ui.msgVBox.Objects = nil
+			ui.msgVBox.Refresh()
+			ui.chatTitle.SetText("Select a chat to start messaging")
+			
 			dialog.ShowInformation("Logged Out", "You have been logged out. Please restart the application to link a new device.", ui.mainWindow)
 			// Close the app after a short delay so they can read the dialog
 			go func() {
