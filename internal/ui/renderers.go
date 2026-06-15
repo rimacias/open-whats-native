@@ -18,13 +18,13 @@ import (
 
 // MessageRenderer defines the strategy for rendering different message types
 type MessageRenderer interface {
-	Render(msg domain.Message, senderName string) fyne.CanvasObject
+	Render(msg domain.Message, senderName string, avatarData []byte) fyne.CanvasObject
 }
 
 // TextMessageRenderer renders standard text messages
 type TextMessageRenderer struct{}
 
-func (r *TextMessageRenderer) Render(msg domain.Message, senderName string) fyne.CanvasObject {
+func (r *TextMessageRenderer) Render(msg domain.Message, senderName string, avatarData []byte) fyne.CanvasObject {
 	wrappedText := wrapText(msg.Text, 60)
 	textLbl := widget.NewLabel(wrappedText)
 	// We deliberately do NOT set Wrapping = fyne.TextWrapWord here.
@@ -42,13 +42,13 @@ func (r *TextMessageRenderer) Render(msg domain.Message, senderName string) fyne
 	paddedText := container.NewPadded(textLbl)
 	bubble := container.NewStack(bg, paddedText)
 
-	return buildMessageRow(msg, senderName, bubble)
+	return buildMessageRow(msg, senderName, avatarData, bubble)
 }
 
 // StickerMessageRenderer renders webp stickers
 type StickerMessageRenderer struct{}
 
-func (r *StickerMessageRenderer) Render(msg domain.Message, senderName string) fyne.CanvasObject {
+func (r *StickerMessageRenderer) Render(msg domain.Message, senderName string, avatarData []byte) fyne.CanvasObject {
 	var content fyne.CanvasObject
 
 	if msg.MediaURL == "" {
@@ -72,19 +72,32 @@ func (r *StickerMessageRenderer) Render(msg domain.Message, senderName string) f
 		}
 	}
 
-	return buildMessageRow(msg, senderName, content)
+	return buildMessageRow(msg, senderName, avatarData, content)
 }
 
-func buildMessageRow(msg domain.Message, senderName string, content fyne.CanvasObject) fyne.CanvasObject {
+func buildMessageRow(msg domain.Message, senderName string, avatarData []byte, content fyne.CanvasObject) fyne.CanvasObject {
 	var vboxObjects []fyne.CanvasObject
 	var senderLbl *widget.Label
+
+	var headerRow *fyne.Container
 
 	if senderName != "" {
 		senderLbl = widget.NewLabelWithStyle(senderName, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 		if msg.IsFromMe {
 			senderLbl.Alignment = fyne.TextAlignTrailing
 		}
-		vboxObjects = append(vboxObjects, senderLbl)
+		
+		if len(avatarData) > 0 && !msg.IsFromMe {
+			imgReader := strings.NewReader(string(avatarData))
+			cImg := canvas.NewImageFromReader(imgReader, "avatar")
+			cImg.FillMode = canvas.ImageFillContain
+			cImg.SetMinSize(fyne.NewSize(30, 30))
+			// Square avatar is sufficient since circle masks are complex in fyne
+			headerRow = container.NewHBox(cImg, senderLbl)
+			vboxObjects = append(vboxObjects, headerRow)
+		} else {
+			vboxObjects = append(vboxObjects, senderLbl)
+		}
 	}
 	
 	vboxObjects = append(vboxObjects, content)
@@ -123,7 +136,7 @@ func buildMessageRow(msg domain.Message, senderName string, content fyne.CanvasO
 // ImageMessageRenderer renders photo/image messages
 type ImageMessageRenderer struct{}
 
-func (r *ImageMessageRenderer) Render(msg domain.Message, senderName string) fyne.CanvasObject {
+func (r *ImageMessageRenderer) Render(msg domain.Message, senderName string, avatarData []byte) fyne.CanvasObject {
 	var content fyne.CanvasObject
 
 	if msg.MediaURL == "" {
@@ -147,7 +160,7 @@ func (r *ImageMessageRenderer) Render(msg domain.Message, senderName string) fyn
 		}
 	}
 
-	return buildMessageRow(msg, senderName, content)
+	return buildMessageRow(msg, senderName, avatarData, content)
 }
 
 // GetMessageRenderer acts as a factory returning the correct rendering strategy

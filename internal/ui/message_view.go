@@ -3,6 +3,8 @@ package ui
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -56,8 +58,25 @@ func (ui *AppUI) refreshMessagesList() {
 			ui.contactMap[msg.SenderJID] = msg.SenderName
 		} else {
 			// Clean up JID if it's a raw JID
-			if strings.Contains(senderName, "@") {
-				senderName = strings.Split(senderName, "@")[0]
+			lookupJID := msg.SenderJID
+			if !strings.Contains(lookupJID, "@") {
+				lookupJID += "@s.whatsapp.net"
+			}
+			if c, err := ui.client.GetContact(context.Background(), lookupJID); err == nil && (c.Name != "" || c.PushName != "") {
+				if c.Name != "" {
+					senderName = c.Name
+				} else {
+					senderName = c.PushName
+				}
+				ui.contactMap[msg.SenderJID] = senderName
+			} else {
+				if strings.Contains(senderName, "@") {
+					senderName = strings.Split(senderName, "@")[0]
+				}
+				if strings.Contains(senderName, ":") {
+					senderName = strings.Split(senderName, ":")[0]
+				}
+				senderName = "+" + senderName
 			}
 		}
 
@@ -67,8 +86,38 @@ func (ui *AppUI) refreshMessagesList() {
 		}
 		prevSenderJID = msg.SenderJID
 
+		var avatar []byte
+		if !msg.IsFromMe {
+			lookupJID := msg.SenderJID
+			if !strings.Contains(lookupJID, "@") {
+				lookupJID += "@s.whatsapp.net"
+			}
+			if av, ok := ui.avatarMap[lookupJID]; ok {
+				avatar = av
+			} else {
+				// Async fetch avatar
+				ui.avatarMap[lookupJID] = nil // Avoid repeated requests
+				go func(jid string) {
+					url, err := ui.client.GetProfilePicture(context.Background(), jid)
+					if err == nil && url != "" {
+						resp, err := http.Get(url)
+						if err == nil {
+							data, err := io.ReadAll(resp.Body)
+							resp.Body.Close()
+							if err == nil && len(data) > 0 {
+								ui.avatarMap[jid] = data
+								fyne.Do(func() {
+									ui.refreshMessagesList()
+								})
+							}
+						}
+					}
+				}(lookupJID)
+			}
+		}
+
 		renderer := GetMessageRenderer(msg)
-		ui.msgVBox.Add(renderer.Render(msg, displaySenderName))
+		ui.msgVBox.Add(renderer.Render(msg, displaySenderName, avatar))
 	}
 	ui.msgVBox.Refresh()
 	if len(ui.filteredMsg) > 0 {

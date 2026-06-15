@@ -49,7 +49,7 @@ The following plan breaks down the features required to match official WhatsApp 
 - *Description*: Allow the user to view and edit their own "About" text and Profile Picture.
 - *Implementation*: Add a settings dialog. Use `client.SetStatusMessage()` and `client.SetProfilePicture()` to update the WhatsApp servers.
 
-**2. Other Users' Profiles & Avatars**
+**2. Other Users' Profiles & Avatars** [x]
 - *Description*: Render profile pictures next to messages and in the left sidebar chat list.
 - *Implementation*: 
   - Call `client.GetProfilePictureInfo(jid, &whatsmeow.GetProfilePictureParams{})` to retrieve avatar URLs.

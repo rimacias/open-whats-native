@@ -1,10 +1,15 @@
 package ui
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
@@ -26,6 +31,7 @@ type AppUI struct {
 	
 	// Caching contacts for name resolution
 	contactMap  map[string]string
+	avatarMap   map[string][]byte
 	allContacts []domain.Contact
 
 	msgScroll   *container.Scroll
@@ -58,6 +64,7 @@ func NewAppUI(client domain.WhatsAppClient, msgStore domain.MessageStore) *AppUI
 		fyneApp:    fyneApp,
 		mainWindow: mainWindow,
 		contactMap: make(map[string]string),
+		avatarMap:  make(map[string][]byte),
 	}
 
 	ui.syncIndicator = widget.NewProgressBarInfinite()
@@ -84,16 +91,59 @@ func (ui *AppUI) Start() {
 	ui.chatList = widget.NewList(
 		func() int { return len(ui.filteredCh) },
 		func() fyne.CanvasObject {
-			return container.NewVBox(
+			// Placeholder image
+			img := canvas.NewImageFromResource(fyne.NewStaticResource("default", []byte{}))
+			img.SetMinSize(fyne.NewSize(40, 40))
+			img.FillMode = canvas.ImageFillContain
+			
+			vbox := container.NewVBox(
 				widget.NewLabelWithStyle("Contact Name Placeholder", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 				widget.NewLabel("Last message preview"),
 			)
+			return container.NewHBox(img, vbox)
 		},
 		func(i widget.ListItemID, o fyne.CanvasObject) {
 			c := ui.filteredCh[i]
-			box := o.(*fyne.Container)
-			box.Objects[0].(*widget.Label).SetText(c.Name)
-			box.Objects[1].(*widget.Label).SetText(c.LastMsg)
+			hbox := o.(*fyne.Container)
+			img := hbox.Objects[0].(*canvas.Image)
+			vbox := hbox.Objects[1].(*fyne.Container)
+			
+			vbox.Objects[0].(*widget.Label).SetText(c.Name)
+			vbox.Objects[1].(*widget.Label).SetText(c.LastMsg)
+
+			lookupJID := c.JID
+			if !strings.Contains(lookupJID, "@") {
+				lookupJID += "@s.whatsapp.net"
+			}
+
+			if av, ok := ui.avatarMap[lookupJID]; ok {
+				if len(av) > 0 {
+					img.Resource = fyne.NewStaticResource("avatar", av)
+				} else {
+					img.Resource = fyne.NewStaticResource("default", []byte{})
+				}
+				img.Refresh()
+			} else {
+				img.Resource = fyne.NewStaticResource("default", []byte{})
+				img.Refresh()
+				ui.avatarMap[lookupJID] = nil // Avoid repeated requests
+				go func(jid string) {
+					url, err := ui.client.GetProfilePicture(context.Background(), jid)
+					if err == nil && url != "" {
+						resp, err := http.Get(url)
+						if err == nil {
+							data, err := io.ReadAll(resp.Body)
+							resp.Body.Close()
+							if err == nil && len(data) > 0 {
+								ui.avatarMap[jid] = data
+								fyne.Do(func() {
+									ui.chatList.RefreshItem(i)
+								})
+							}
+						}
+					}
+				}(lookupJID)
+			}
 		},
 	)
 

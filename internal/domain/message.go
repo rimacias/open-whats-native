@@ -41,6 +41,8 @@ type ChatPreview struct {
 
 // WhatsAppClient defines the behavior for the WhatsApp integration.
 type WhatsAppClient interface {
+	GetContact(ctx context.Context, jid string) (Contact, error)
+	GetProfilePicture(ctx context.Context, jid string) (string, error)
 	SendMessage(ctx context.Context, jid string, text string) error
 	SendImage(ctx context.Context, jid string, data []byte, mimeType string) error
 	GetContacts(ctx context.Context) ([]Contact, error)

@@ -214,6 +214,42 @@ func (c *Client) GetContacts(ctx context.Context) ([]domain.Contact, error) {
 	return contacts, nil
 }
 
+// GetContact implements domain.WhatsAppClient
+func (c *Client) GetContact(ctx context.Context, jid string) (domain.Contact, error) {
+	parsed, err := types.ParseJID(jid)
+	if err != nil {
+		return domain.Contact{}, err
+	}
+	if c.client.Store.Contacts == nil {
+		return domain.Contact{}, fmt.Errorf("contacts store is nil")
+	}
+	info, err := c.client.Store.Contacts.GetContact(ctx, parsed)
+	if err != nil {
+		return domain.Contact{}, err
+	}
+	return domain.Contact{
+		JID:      parsed.ToNonAD().String(),
+		Name:     info.FullName,
+		PushName: info.PushName,
+	}, nil
+}
+
+// GetProfilePicture implements domain.WhatsAppClient
+func (c *Client) GetProfilePicture(ctx context.Context, jid string) (string, error) {
+	parsed, err := types.ParseJID(jid)
+	if err != nil {
+		return "", err
+	}
+	info, err := c.client.GetProfilePictureInfo(ctx, parsed, &whatsmeow.GetProfilePictureParams{})
+	if err != nil {
+		return "", err
+	}
+	if info != nil {
+		return info.URL, nil
+	}
+	return "", nil
+}
+
 // RegisterMessageCallback implements domain.WhatsAppClient
 func (c *Client) RegisterMessageCallback(callback func(msg domain.Message)) {
 	c.messageCallback = callback
@@ -381,6 +417,9 @@ func (c *Client) eventHandler(evt interface{}) {
 						} else if info.GetParticipant() != "" {
 							senderJID = info.GetParticipant()
 						}
+					}
+					if parsed, err := types.ParseJID(senderJID); err == nil {
+						senderJID = parsed.ToNonAD().String()
 					}
 
 					var reactions []domain.Reaction
