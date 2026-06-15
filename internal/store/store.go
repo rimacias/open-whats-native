@@ -108,11 +108,14 @@ func (ls *LocalStore) SaveMessage(ctx context.Context, msg domain.Message) error
 // GetMessages implements domain.MessageStore
 func (ls *LocalStore) GetMessages(ctx context.Context, chatJID string, limit int) ([]domain.Message, error) {
 	query := `
-		SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, is_image, media_url, timestamp, is_from_me, reactions
-		FROM messages
-		WHERE chat_jid = ?
+		SELECT * FROM (
+			SELECT id, chat_jid, sender_jid, sender_name, text, is_sticker, is_image, media_url, timestamp, is_from_me, reactions
+			FROM messages
+			WHERE chat_jid = ?
+			ORDER BY timestamp DESC
+			LIMIT ?
+		) sub
 		ORDER BY timestamp ASC
-		LIMIT ?
 	`
 	rows, err := ls.db.QueryContext(ctx, query, chatJID, limit)
 	if err != nil {

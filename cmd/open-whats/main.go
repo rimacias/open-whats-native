@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	_ "image/jpeg"
+	_ "image/png"
 	"os"
 	"path/filepath"
+
+	_ "golang.org/x/image/webp"
 
 	"open-whats/internal/store"
 	"open-whats/internal/ui"

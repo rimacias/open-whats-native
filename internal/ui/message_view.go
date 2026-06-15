@@ -130,7 +130,12 @@ func (ui *AppUI) refreshMessagesList() {
 	}
 	ui.msgVBox.Refresh()
 	if len(ui.filteredMsg) > 0 {
-		ui.msgScroll.ScrollToBottom()
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			fyne.Do(func() {
+				ui.msgScroll.ScrollToBottom()
+			})
+		}()
 	}
 }
 

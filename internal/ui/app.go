@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	_ "embed"
 	"io"
 	"net/http"
 	"strings"
@@ -15,6 +16,9 @@ import (
 
 	"open-whats/internal/domain"
 )
+
+//go:embed images/blank_avatar.jpg
+var defaultAvatarBytes []byte
 
 // AppUI coordinates the entire Fyne application state and layout
 type AppUI struct {
@@ -93,7 +97,7 @@ func (ui *AppUI) Start() {
 		func() int { return len(ui.filteredCh) },
 		func() fyne.CanvasObject {
 			// Placeholder image
-			img := canvas.NewImageFromResource(fyne.NewStaticResource("default", []byte{}))
+			img := canvas.NewImageFromResource(fyne.NewStaticResource("default.jpg", defaultAvatarBytes))
 			img.SetMinSize(fyne.NewSize(40, 40))
 			img.FillMode = canvas.ImageFillContain
 			
@@ -123,11 +127,11 @@ func (ui *AppUI) Start() {
 				if len(av) > 0 {
 					img.Resource = fyne.NewStaticResource("avatar", av)
 				} else {
-					img.Resource = fyne.NewStaticResource("default", []byte{})
+					img.Resource = fyne.NewStaticResource("default.jpg", defaultAvatarBytes)
 				}
 				img.Refresh()
 			} else {
-				img.Resource = fyne.NewStaticResource("default", []byte{})
+				img.Resource = fyne.NewStaticResource("default.jpg", defaultAvatarBytes)
 				img.Refresh()
 				ui.avatarMap[lookupJID] = nil // Avoid repeated requests
 				go func(jid string) {
@@ -165,7 +169,7 @@ func (ui *AppUI) Start() {
 		if av, ok := ui.avatarMap[lookupJID]; ok && len(av) > 0 {
 			ui.chatAvatar.Resource = fyne.NewStaticResource("avatar.png", av)
 		} else {
-			ui.chatAvatar.Resource = fyne.NewStaticResource("default", []byte{})
+			ui.chatAvatar.Resource = fyne.NewStaticResource("default.jpg", defaultAvatarBytes)
 		}
 		ui.chatAvatar.Refresh()
 
@@ -192,7 +196,7 @@ func (ui *AppUI) Start() {
 
 	// 2. Build Right Side (Chat Area & Search)
 	ui.chatTitle = widget.NewLabelWithStyle("Select a chat to start messaging", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	ui.chatAvatar = canvas.NewImageFromResource(fyne.NewStaticResource("default", []byte{}))
+	ui.chatAvatar = canvas.NewImageFromResource(fyne.NewStaticResource("default.jpg", defaultAvatarBytes))
 	ui.chatAvatar.SetMinSize(fyne.NewSize(40, 40))
 	ui.chatAvatar.FillMode = canvas.ImageFillContain
 	

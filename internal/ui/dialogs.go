@@ -210,7 +210,7 @@ func (ui *AppUI) showChatDetailsDialog() {
 	if len(avatarBytes) > 0 {
 		avatarImg = canvas.NewImageFromResource(fyne.NewStaticResource("avatar.png", avatarBytes))
 	} else {
-		avatarImg = canvas.NewImageFromResource(fyne.NewStaticResource("default", []byte{}))
+		avatarImg = canvas.NewImageFromResource(fyne.NewStaticResource("default.jpg", defaultAvatarBytes))
 	}
 	avatarImg.FillMode = canvas.ImageFillContain
 	avatarImg.SetMinSize(fyne.NewSize(150, 150))
