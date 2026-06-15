@@ -52,5 +52,8 @@ This project strictly follows SOLID principles and Domain-Driven Design:
 ## Roadmap
 See the planned features in our issue tracker, including media attachments, profile viewing, and status support.
 
+## License
+This project is licensed under the GNU General Public License v3 (GPLv3) - see the [LICENSE](LICENSE) file for details.
+
 ## Disclaimer
 This is an unofficial project. It is not affiliated, associated, authorized, endorsed by, or in any way officially connected with WhatsApp Inc., or any of its subsidiaries or its affiliates. The official WhatsApp website can be found at https://www.whatsapp.com.
